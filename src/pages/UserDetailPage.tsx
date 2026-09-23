@@ -1,4 +1,13 @@
-// UserDetailPage - will be implemented in Step 14
-export default function UserDetailPage() {
-  return <div>User Detail Page placeholder</div>;
-}
+/**
+ * User Detail Page
+ * 
+ * Page for viewing user details
+ */
+import React from 'react';
+import UserDetail from '../components/users/UserDetail';
+
+const UserDetailPage: React.FC = () => {
+  return <UserDetail />;
+};
+
+export default UserDetailPage;

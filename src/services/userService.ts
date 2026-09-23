@@ -37,3 +37,26 @@ export const getUser = async (id: number): Promise<User> => {
   const response = await api.get<{ success: boolean; data: { user: User } }>(`/users/${id}`);
   return response.data.data.user;
 };
+
+/**
+ * Create new user
+ */
+export const createUser = async (userData: User): Promise<User> => {
+  const response = await api.post<{ success: boolean; data: { user: User } }>('/users', userData);
+  return response.data.data.user;
+};
+
+/**
+ * Update user
+ */
+export const updateUser = async (id: number, userData: Partial<User>): Promise<User> => {
+  const response = await api.put<{ success: boolean; data: { user: User } }>(`/users/${id}`, userData);
+  return response.data.data.user;
+};
+
+/**
+ * Delete user
+ */
+export const deleteUser = async (id: number): Promise<void> => {
+  await api.delete(`/users/${id}`);
+};
