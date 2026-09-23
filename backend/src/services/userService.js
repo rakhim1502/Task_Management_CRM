@@ -1,7 +1,7 @@
 /**
  * User Service
  * 
- * Business logic for user operations
+ * Business logic for user operations with pagination, filtering, and search
  */
 const bcrypt = require('bcrypt');
 const prisma = require('../config/prisma');
@@ -11,28 +11,78 @@ const { validateEmail, validatePassword } = require('../utils/validation');
 const SALT_ROUNDS = 10;
 
 /**
- * Get all users (exclude password)
+ * Get users with pagination, filtering, and search
  * 
- * @returns {Promise<Array>}
+ * @param {Object} filters - Filter options
+ * @returns {Promise<{users: Array, pagination: Object}>}
  */
-const getUsers = async () => {
-  return prisma.user.findMany({
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      createdAt: true,
-      updatedAt: true,
-      _count: {
-        select: {
-          assignedTasks: true,
-          createdTasks: true
+const getUsers = async (filters = {}) => {
+  const {
+    role,
+    search,
+    page = 1,
+    limit = 10,
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = filters;
+
+  // Build where clause
+  const where = {};
+
+  // Filter by role
+  if (role) {
+    const validRoles = ['ADMIN', 'MANAGER', 'EMPLOYEE'];
+    if (validRoles.includes(role)) {
+      where.role = role;
+    }
+  }
+
+  // Search in name and email
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } }
+    ];
+  }
+
+  // Validate sort field
+  const validSortFields = ['createdAt', 'name', 'email', 'role'];
+  const orderBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+
+  // Get users and total count in parallel
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            assignedTasks: true,
+            createdTasks: true
+          }
         }
-      }
-    },
-    orderBy: { createdAt: 'desc' }
-  });
+      },
+      orderBy: { [orderBy]: sortOrder },
+      skip: (page - 1) * limit,
+      take: limit
+    }),
+    prisma.user.count({ where })
+  ]);
+
+  return {
+    users,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
 };
 
 /**
@@ -54,11 +104,56 @@ const getUser = async (id) => {
       assignedTasks: {
         include: {
           creator: { select: { id: true, name: true, email: true } }
-        }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10 // Last 10 tasks
       },
       createdTasks: {
         include: {
           assignee: { select: { id: true, name: true, email: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10 // Last 10 tasks
+      },
+      _count: {
+        select: {
+          assignedTasks: true,
+          createdTasks: true
+        }
+      }
+    }
+  });
+};
+
+/**
+ * Get current user profile (for authenticated user)
+ * 
+ * @param {number} id - User ID
+ * @returns {Promise<Object|null>}
+ */
+const getUserProfile = async (id) => {
+  return prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      updatedAt: true,
+      assignedTasks: {
+        where: {
+          status: { not: 'COMPLETED' }
+        },
+        include: {
+          creator: { select: { id: true, name: true, email: true } }
+        },
+        orderBy: { dueDate: 'asc' }
+      },
+      _count: {
+        select: {
+          assignedTasks: true,
+          createdTasks: true
         }
       }
     }
@@ -278,6 +373,7 @@ const deleteUser = async (id) => {
 module.exports = {
   getUsers,
   getUser,
+  getUserProfile,
   createUser,
   updateUser,
   deleteUser
