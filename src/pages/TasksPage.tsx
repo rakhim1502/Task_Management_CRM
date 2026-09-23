@@ -1,4 +1,13 @@
-// TasksPage - will be implemented in Step 13
-export default function TasksPage() {
-  return <div>Tasks Page placeholder</div>;
-}
+/**
+ * Tasks Page
+ * 
+ * Main tasks page with task list
+ */
+import React from 'react';
+import TaskList from '../components/tasks/TaskList';
+
+const TasksPage: React.FC = () => {
+  return <TaskList />;
+};
+
+export default TasksPage;

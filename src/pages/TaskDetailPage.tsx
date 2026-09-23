@@ -1,4 +1,13 @@
-// TaskDetailPage - will be implemented in Step 13
-export default function TaskDetailPage() {
-  return <div>Task Detail Page placeholder</div>;
-}
+/**
+ * Task Detail Page
+ * 
+ * Page for viewing task details
+ */
+import React from 'react';
+import TaskDetail from '../components/tasks/TaskDetail';
+
+const TaskDetailPage: React.FC = () => {
+  return <TaskDetail />;
+};
+
+export default TaskDetailPage;
