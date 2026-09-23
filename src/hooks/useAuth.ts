@@ -1,11 +1,17 @@
-// useAuth hook - will be implemented in Step 11
+/**
+ * useAuth Hook
+ * 
+ * Custom hook for accessing authentication context.
+ */
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
+  
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider');
   }
+  
   return context;
-}
+};
