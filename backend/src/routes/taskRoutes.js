@@ -20,6 +20,17 @@ router.use(authMiddleware);
 /**
  * GET /api/tasks
  * Get all tasks with filters, search, pagination
+ * 
+ * Query params:
+ * - status: Filter by status (TODO, IN_PROGRESS, COMPLETED)
+ * - priority: Filter by priority (LOW, MEDIUM, HIGH)
+ * - assignedTo: Filter by assigned user ID
+ * - createdBy: Filter by creator user ID
+ * - search: Search in title and description
+ * - page: Page number (default: 1)
+ * - limit: Items per page (default: 10)
+ * 
+ * Access:
  * - ADMIN/MANAGER: sees all tasks
  * - EMPLOYEE: sees only tasks assigned to them
  */
@@ -28,6 +39,8 @@ router.get('/', taskController.getTasks);
 /**
  * GET /api/tasks/:id
  * Get task by ID
+ * 
+ * Access:
  * - ADMIN/MANAGER: can see any task
  * - EMPLOYEE: can only see tasks assigned to them
  */
@@ -35,13 +48,21 @@ router.get('/:id', taskController.getTask);
 
 /**
  * POST /api/tasks
- * Create new task (ADMIN, MANAGER only)
+ * Create new task
+ * 
+ * Body: { title, description?, status?, priority?, dueDate?, assignedTo? }
+ * 
+ * Access: ADMIN, MANAGER only
  */
 router.post('/', roleMiddleware('ADMIN', 'MANAGER'), taskController.createTask);
 
 /**
  * PUT /api/tasks/:id
  * Update task
+ * 
+ * Body: { title?, description?, status?, priority?, dueDate?, assignedTo? }
+ * 
+ * Access:
  * - ADMIN/MANAGER: can update any field
  * - EMPLOYEE: can only update status, and only for tasks assigned to them
  */
@@ -49,7 +70,9 @@ router.put('/:id', taskController.updateTask);
 
 /**
  * DELETE /api/tasks/:id
- * Delete task (ADMIN only)
+ * Delete task
+ * 
+ * Access: ADMIN only
  */
 router.delete('/:id', roleMiddleware('ADMIN'), taskController.deleteTask);
 

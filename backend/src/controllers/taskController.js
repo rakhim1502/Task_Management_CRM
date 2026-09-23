@@ -2,7 +2,7 @@
  * Task Controller
  * 
  * Handles HTTP requests for task operations with role-based access control:
- * - ADMIN: Full access to all tasks
+ * - ADMIN: Full access to all tasks (CRUD)
  * - MANAGER: Can create, view, and update tasks (no delete)
  * - EMPLOYEE: Can view own tasks and update status only
  */
@@ -11,6 +11,15 @@ const taskService = require('../services/taskService');
 /**
  * GET /api/tasks
  * Get all tasks with filters, search, pagination
+ * 
+ * Query params:
+ * - status: Filter by status (TODO, IN_PROGRESS, COMPLETED)
+ * - priority: Filter by priority (LOW, MEDIUM, HIGH)
+ * - assignedTo: Filter by assigned user ID
+ * - createdBy: Filter by creator user ID
+ * - search: Search in title and description
+ * - page: Page number (default: 1)
+ * - limit: Items per page (default: 10)
  */
 const getTasks = async (req, res, next) => {
   try {
@@ -47,6 +56,15 @@ const getTasks = async (req, res, next) => {
 const getTask = async (req, res, next) => {
   try {
     const taskId = parseInt(req.params.id);
+
+    // Validate task ID
+    if (isNaN(taskId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid task ID'
+      });
+    }
+
     const task = await taskService.getTask(taskId);
 
     if (!task) {
@@ -76,11 +94,61 @@ const getTask = async (req, res, next) => {
 /**
  * POST /api/tasks
  * Create new task (ADMIN, MANAGER only)
+ * 
+ * Body: { title, description?, status?, priority?, dueDate?, assignedTo? }
  */
 const createTask = async (req, res, next) => {
   try {
+    const { title, description, status, priority, dueDate, assignedTo } = req.body;
+
+    // Validate required fields
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required'
+      });
+    }
+
+    // Validate status if provided
+    if (status) {
+      const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid status. Must be TODO, IN_PROGRESS, or COMPLETED'
+        });
+      }
+    }
+
+    // Validate priority if provided
+    if (priority) {
+      const validPriorities = ['LOW', 'MEDIUM', 'HIGH'];
+      if (!validPriorities.includes(priority)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid priority. Must be LOW, MEDIUM, or HIGH'
+        });
+      }
+    }
+
+    // Validate dueDate if provided
+    if (dueDate) {
+      const date = new Date(dueDate);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid due date format'
+        });
+      }
+    }
+
     const task = await taskService.createTask({
-      ...req.body,
+      title,
+      description,
+      status,
+      priority,
+      dueDate,
+      assignedTo,
       createdBy: req.user.id
     });
 
@@ -103,6 +171,50 @@ const createTask = async (req, res, next) => {
 const updateTask = async (req, res, next) => {
   try {
     const taskId = parseInt(req.params.id);
+
+    // Validate task ID
+    if (isNaN(taskId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid task ID'
+      });
+    }
+
+    const { title, description, status, priority, dueDate, assignedTo } = req.body;
+
+    // Validate status if provided
+    if (status) {
+      const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid status. Must be TODO, IN_PROGRESS, or COMPLETED'
+        });
+      }
+    }
+
+    // Validate priority if provided
+    if (priority) {
+      const validPriorities = ['LOW', 'MEDIUM', 'HIGH'];
+      if (!validPriorities.includes(priority)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid priority. Must be LOW, MEDIUM, or HIGH'
+        });
+      }
+    }
+
+    // Validate dueDate if provided
+    if (dueDate) {
+      const date = new Date(dueDate);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid due date format'
+        });
+      }
+    }
+
     const task = await taskService.updateTask(taskId, req.body, req.user);
 
     res.status(200).json({
@@ -122,6 +234,15 @@ const updateTask = async (req, res, next) => {
 const deleteTask = async (req, res, next) => {
   try {
     const taskId = parseInt(req.params.id);
+
+    // Validate task ID
+    if (isNaN(taskId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid task ID'
+      });
+    }
+
     await taskService.deleteTask(taskId);
 
     res.status(200).json({

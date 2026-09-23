@@ -17,10 +17,31 @@ const getTasks = async (filters) => {
   // Build where clause
   const where = {};
 
-  if (status) where.status = status;
-  if (priority) where.priority = priority;
-  if (assignedTo) where.assignedTo = assignedTo;
-  if (createdBy) where.createdBy = createdBy;
+  // Filter by status
+  if (status) {
+    const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED'];
+    if (validStatuses.includes(status)) {
+      where.status = status;
+    }
+  }
+
+  // Filter by priority
+  if (priority) {
+    const validPriorities = ['LOW', 'MEDIUM', 'HIGH'];
+    if (validPriorities.includes(priority)) {
+      where.priority = priority;
+    }
+  }
+
+  // Filter by assigned user
+  if (assignedTo) {
+    where.assignedTo = assignedTo;
+  }
+
+  // Filter by creator
+  if (createdBy) {
+    where.createdBy = createdBy;
+  }
 
   // Search in title and description
   if (search) {
@@ -99,6 +120,24 @@ const createTask = async (data) => {
       error.statusCode = 404;
       throw error;
     }
+
+    // Validate assigned user is EMPLOYEE
+    if (assignee.role !== 'EMPLOYEE') {
+      const error = new Error('Can only assign tasks to EMPLOYEE role users');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  // Validate createdBy exists
+  const creator = await prisma.user.findUnique({
+    where: { id: createdBy }
+  });
+
+  if (!creator) {
+    const error = new Error('Creator user not found');
+    error.statusCode = 404;
+    throw error;
   }
 
   // Create task
@@ -178,14 +217,54 @@ const updateTask = async (id, data, user) => {
   }
 
   // ADMIN/MANAGER: Can update any field
+  // Validate assignedTo if provided
+  if (updateData.assignedTo) {
+    const assignee = await prisma.user.findUnique({
+      where: { id: parseInt(updateData.assignedTo) }
+    });
+
+    if (!assignee) {
+      const error = new Error('Assigned user not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (assignee.role !== 'EMPLOYEE') {
+      const error = new Error('Can only assign tasks to EMPLOYEE role users');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
   // Convert date strings to Date objects
   if (updateData.dueDate) {
-    updateData.dueDate = new Date(updateData.dueDate);
+    const date = new Date(updateData.dueDate);
+    if (isNaN(date.getTime())) {
+      const error = new Error('Invalid due date format');
+      error.statusCode = 400;
+      throw error;
+    }
+    updateData.dueDate = date;
   }
 
   // Convert assignedTo to integer
   if (updateData.assignedTo) {
     updateData.assignedTo = parseInt(updateData.assignedTo);
+  }
+
+  // Trim title if provided
+  if (updateData.title) {
+    if (updateData.title.trim().length === 0) {
+      const error = new Error('Title cannot be empty');
+      error.statusCode = 400;
+      throw error;
+    }
+    updateData.title = updateData.title.trim();
+  }
+
+  // Trim description if provided
+  if (updateData.description) {
+    updateData.description = updateData.description.trim();
   }
 
   // Update task
