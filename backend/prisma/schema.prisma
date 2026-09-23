@@ -1,6 +1,18 @@
-// This is the Prisma schema for the backend
-// Backend runs separately from this Vite project
-// See backend/README.md for setup instructions
+// ============================================
+// Task Management CRM - Prisma Schema
+// ============================================
+// Database: PostgreSQL
+// ORM: Prisma
+// 
+// Models:
+//   - User (employees, managers, admins)
+//   - Task (work items assigned to users)
+//
+// Relations:
+//   - User has many createdTasks (1:N)
+//   - User has many assignedTasks (1:N)
+//   - Task belongs to one assignee (N:1, optional)
+//   - Task belongs to one creator (N:1, required)
 
 generator client {
   provider = "prisma-client-js"
@@ -11,34 +23,54 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
+/// User roles for role-based access control
 enum Role {
-  ADMIN
-  MANAGER
-  EMPLOYEE
+  ADMIN     // Full system access
+  MANAGER   // Can manage tasks and view employees
+  EMPLOYEE  // Can view and update own tasks
 }
 
+/// Task status lifecycle
 enum TaskStatus {
-  TODO
-  IN_PROGRESS
-  COMPLETED
+  TODO          // Not started yet
+  IN_PROGRESS   // Currently being worked on
+  COMPLETED     // Task is done
 }
 
+/// Task priority levels
 enum Priority {
-  LOW
-  MEDIUM
-  HIGH
+  LOW       // Can wait
+  MEDIUM    // Normal priority
+  HIGH      // Urgent, needs immediate attention
 }
+
+// ============================================
+// MODELS
+// ============================================
 
 model User {
-  id            Int        @id @default(autoincrement())
-  name          String
-  email         String     @unique
-  password      String
-  role          Role       @default(EMPLOYEE)
-  createdTasks  Task[]     @relation("CreatedTasks")
-  assignedTasks Task[]     @relation("AssignedTasks")
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(EMPLOYEE)
+
+  // Relations
+  createdTasks  Task[] @relation("CreatedTasks")
+  assignedTasks Task[] @relation("AssignedTasks")
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Indexes
+  @@index([email])
+  @@index([role])
+  @@map("users")
 }
 
 model Task {
@@ -48,10 +80,25 @@ model Task {
   status      TaskStatus @default(TODO)
   priority    Priority   @default(MEDIUM)
   dueDate     DateTime?
+
+  // Foreign keys
   assignedTo  Int?
   createdBy   Int
-  assignee    User?      @relation("AssignedTasks", fields: [assignedTo], references: [id])
-  creator     User       @relation("CreatedTasks", fields: [createdBy], references: [id])
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  assignee    User?  @relation("AssignedTasks", fields: [assignedTo], references: [id], onDelete: SetNull)
+  creator     User   @relation("CreatedTasks", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Indexes for common queries
+  @@index([status])
+  @@index([priority])
+  @@index([assignedTo])
+  @@index([createdBy])
+  @@index([dueDate])
+  @@index([createdAt])
+  @@map("tasks")
 }
