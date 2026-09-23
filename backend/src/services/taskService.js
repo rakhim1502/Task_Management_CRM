@@ -1,55 +1,205 @@
 /**
  * Task Service
  * 
- * Business logic for task operations with role-based access control
+ * Business logic for task operations with:
+ * - Role-based access control
+ * - Advanced filtering (status, priority, date range, user)
+ * - Full-text search (title, description)
+ * - Pagination & sorting
+ * - Complex query combinations
  */
 const prisma = require('../config/prisma');
 
+// Valid enum values
+const VALID_STATUSES = ['TODO', 'IN_PROGRESS', 'COMPLETED'];
+const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'];
+const VALID_SORT_FIELDS = ['createdAt', 'updatedAt', 'dueDate', 'title', 'priority'];
+const VALID_SORT_ORDERS = ['asc', 'desc'];
+
 /**
- * Get tasks with filters, search, pagination
+ * Build Prisma where clause from filters
  * 
  * @param {Object} filters - Filter options
- * @returns {Promise<{tasks: Array, pagination: Object}>}
+ * @returns {Object} Prisma where clause
  */
-const getTasks = async (filters) => {
-  const { status, priority, assignedTo, createdBy, search, page = 1, limit = 10 } = filters;
+const buildWhereClause = (filters) => {
+  const {
+    status,
+    priority,
+    assignedTo,
+    createdBy,
+    search,
+    fromDate,
+    toDate,
+    overdue,
+    statuses,
+    priorities
+  } = filters;
 
-  // Build where clause
   const where = {};
 
-  // Filter by status
-  if (status) {
-    const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED'];
-    if (validStatuses.includes(status)) {
-      where.status = status;
+  // ============================================
+  // STATUS FILTER
+  // ============================================
+  
+  // Single status filter
+  if (status && VALID_STATUSES.includes(status)) {
+    where.status = status;
+  }
+
+  // Multiple statuses filter (array)
+  if (statuses && Array.isArray(statuses) && statuses.length > 0) {
+    const validStatuses = statuses.filter(s => VALID_STATUSES.includes(s));
+    if (validStatuses.length > 0) {
+      where.status = { in: validStatuses };
     }
   }
 
-  // Filter by priority
-  if (priority) {
-    const validPriorities = ['LOW', 'MEDIUM', 'HIGH'];
-    if (validPriorities.includes(priority)) {
-      where.priority = priority;
+  // ============================================
+  // PRIORITY FILTER
+  // ============================================
+  
+  // Single priority filter
+  if (priority && VALID_PRIORITIES.includes(priority)) {
+    where.priority = priority;
+  }
+
+  // Multiple priorities filter (array)
+  if (priorities && Array.isArray(priorities) && priorities.length > 0) {
+    const validPriorities = priorities.filter(p => VALID_PRIORITIES.includes(p));
+    if (validPriorities.length > 0) {
+      where.priority = { in: validPriorities };
     }
   }
 
+  // ============================================
+  // USER FILTERS
+  // ============================================
+  
   // Filter by assigned user
   if (assignedTo) {
-    where.assignedTo = assignedTo;
+    where.assignedTo = parseInt(assignedTo);
   }
 
   // Filter by creator
   if (createdBy) {
-    where.createdBy = createdBy;
+    where.createdBy = parseInt(createdBy);
   }
 
-  // Search in title and description
-  if (search) {
+  // ============================================
+  // DATE RANGE FILTER
+  // ============================================
+  
+  if (fromDate || toDate) {
+    where.createdAt = {};
+
+    if (fromDate) {
+      const from = new Date(fromDate);
+      if (!isNaN(from.getTime())) {
+        where.createdAt.gte = from;
+      }
+    }
+
+    if (toDate) {
+      const to = new Date(toDate);
+      if (!isNaN(to.getTime())) {
+        // Set to end of day
+        to.setHours(23, 59, 59, 999);
+        where.createdAt.lte = to;
+      }
+    }
+
+    // Remove empty object
+    if (Object.keys(where.createdAt).length === 0) {
+      delete where.createdAt;
+    }
+  }
+
+  // ============================================
+  // DUE DATE FILTERS
+  // ============================================
+  
+  // Overdue tasks (due date passed and not completed)
+  if (overdue === 'true' || overdue === true) {
+    where.dueDate = { lt: new Date() };
+    where.status = { not: 'COMPLETED' };
+  }
+
+  // Due date range
+  if (filters.dueFrom || filters.dueTo) {
+    where.dueDate = where.dueDate || {};
+
+    if (filters.dueFrom) {
+      const from = new Date(filters.dueFrom);
+      if (!isNaN(from.getTime())) {
+        where.dueDate.gte = from;
+      }
+    }
+
+    if (filters.dueTo) {
+      const to = new Date(filters.dueTo);
+      if (!isNaN(to.getTime())) {
+        to.setHours(23, 59, 59, 999);
+        where.dueDate.lte = to;
+      }
+    }
+  }
+
+  // ============================================
+  // SEARCH (Full-text in title & description)
+  // ============================================
+  
+  if (search && search.trim().length > 0) {
+    const searchTerm = search.trim();
     where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } }
+      { title: { contains: searchTerm, mode: 'insensitive' } },
+      { description: { contains: searchTerm, mode: 'insensitive' } }
     ];
   }
+
+  return where;
+};
+
+/**
+ * Build Prisma orderBy clause from sorting options
+ * 
+ * @param {string} sortBy - Field to sort by
+ * @param {string} sortOrder - Sort direction (asc/desc)
+ * @returns {Object} Prisma orderBy clause
+ */
+const buildOrderByClause = (sortBy = 'createdAt', sortOrder = 'desc') => {
+  // Validate sort field
+  const field = VALID_SORT_FIELDS.includes(sortBy) ? sortBy : 'createdAt';
+  
+  // Validate sort order
+  const order = VALID_SORT_ORDERS.includes(sortOrder) ? sortOrder : 'desc';
+
+  return { [field]: order };
+};
+
+/**
+ * Get tasks with advanced filters, search, pagination, sorting
+ * 
+ * @param {Object} filters - Filter options
+ * @returns {Promise<{tasks: Array, pagination: Object, filters: Object}>}
+ */
+const getTasks = async (filters) => {
+  const {
+    page = 1,
+    limit = 10,
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = filters;
+
+  // Validate pagination
+  const validPage = Math.max(1, parseInt(page) || 1);
+  const validLimit = Math.min(100, Math.max(1, parseInt(limit) || 10));
+
+  // Build where clause
+  const where = buildWhereClause(filters);
+
+  // Build orderBy clause
+  const orderBy = buildOrderByClause(sortBy, sortOrder);
 
   // Get tasks and total count in parallel
   const [tasks, total] = await Promise.all([
@@ -59,9 +209,9 @@ const getTasks = async (filters) => {
         assignee: { select: { id: true, name: true, email: true } },
         creator: { select: { id: true, name: true, email: true } }
       },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit
+      orderBy,
+      skip: (validPage - 1) * validLimit,
+      take: validLimit
     }),
     prisma.task.count({ where })
   ]);
@@ -69,10 +219,26 @@ const getTasks = async (filters) => {
   return {
     tasks,
     pagination: {
-      page,
-      limit,
+      page: validPage,
+      limit: validLimit,
       total,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / validLimit)
+    },
+    filters: {
+      applied: {
+        status: filters.status || null,
+        statuses: filters.statuses || null,
+        priority: filters.priority || null,
+        priorities: filters.priorities || null,
+        assignedTo: filters.assignedTo || null,
+        createdBy: filters.createdBy || null,
+        search: filters.search || null,
+        fromDate: filters.fromDate || null,
+        toDate: filters.toDate || null,
+        overdue: filters.overdue || null,
+        sortBy,
+        sortOrder
+      }
     }
   };
 };
@@ -205,8 +371,7 @@ const updateTask = async (id, data, user) => {
 
     // Validate status value
     if (filteredData.status) {
-      const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED'];
-      if (!validStatuses.includes(filteredData.status)) {
+      if (!VALID_STATUSES.includes(filteredData.status)) {
         const error = new Error('Invalid status. Must be TODO, IN_PROGRESS, or COMPLETED');
         error.statusCode = 400;
         throw error;
@@ -301,10 +466,57 @@ const deleteTask = async (id) => {
   });
 };
 
+/**
+ * Get task statistics (for dashboard)
+ * 
+ * @returns {Promise<Object>}
+ */
+const getTaskStats = async () => {
+  const [
+    total,
+    byStatus,
+    byPriority,
+    overdue
+  ] = await Promise.all([
+    prisma.task.count(),
+    prisma.task.groupBy({
+      by: ['status'],
+      _count: true
+    }),
+    prisma.task.groupBy({
+      by: ['priority'],
+      _count: true
+    }),
+    prisma.task.count({
+      where: {
+        dueDate: { lt: new Date() },
+        status: { not: 'COMPLETED' }
+      }
+    })
+  ]);
+
+  return {
+    total,
+    byStatus: byStatus.reduce((acc, item) => {
+      acc[item.status] = item._count;
+      return acc;
+    }, {}),
+    byPriority: byPriority.reduce((acc, item) => {
+      acc[item.priority] = item._count;
+      return acc;
+    }, {}),
+    overdue
+  };
+};
+
 module.exports = {
   getTasks,
   getTask,
   createTask,
   updateTask,
-  deleteTask
+  deleteTask,
+  getTaskStats,
+  VALID_STATUSES,
+  VALID_PRIORITIES,
+  VALID_SORT_FIELDS
 };

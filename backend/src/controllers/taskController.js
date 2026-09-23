@@ -1,36 +1,75 @@
 /**
  * Task Controller
  * 
- * Handles HTTP requests for task operations with role-based access control:
- * - ADMIN: Full access to all tasks (CRUD)
- * - MANAGER: Can create, view, and update tasks (no delete)
- * - EMPLOYEE: Can view own tasks and update status only
+ * Handles HTTP requests for task operations with:
+ * - Role-based access control
+ * - Advanced filtering (status, priority, date range, user)
+ * - Full-text search (title, description)
+ * - Pagination & sorting
  */
 const taskService = require('../services/taskService');
 
 /**
  * GET /api/tasks
- * Get all tasks with filters, search, pagination
+ * Get all tasks with advanced filters, search, pagination, sorting
  * 
  * Query params:
  * - status: Filter by status (TODO, IN_PROGRESS, COMPLETED)
+ * - statuses: Filter by multiple statuses (comma-separated: TODO,IN_PROGRESS)
  * - priority: Filter by priority (LOW, MEDIUM, HIGH)
+ * - priorities: Filter by multiple priorities (comma-separated: HIGH,MEDIUM)
  * - assignedTo: Filter by assigned user ID
  * - createdBy: Filter by creator user ID
  * - search: Search in title and description
+ * - fromDate: Filter tasks created after this date (YYYY-MM-DD)
+ * - toDate: Filter tasks created before this date (YYYY-MM-DD)
+ * - dueFrom: Filter tasks due after this date (YYYY-MM-DD)
+ * - dueTo: Filter tasks due before this date (YYYY-MM-DD)
+ * - overdue: Filter overdue tasks (true/false)
  * - page: Page number (default: 1)
- * - limit: Items per page (default: 10)
+ * - limit: Items per page (default: 10, max: 100)
+ * - sortBy: Sort field (createdAt, updatedAt, dueDate, title, priority)
+ * - sortOrder: Sort direction (asc, desc)
  */
 const getTasks = async (req, res, next) => {
   try {
+    // Parse multiple values (comma-separated)
+    const statuses = req.query.statuses 
+      ? req.query.statuses.split(',').map(s => s.trim().toUpperCase())
+      : undefined;
+
+    const priorities = req.query.priorities 
+      ? req.query.priorities.split(',').map(p => p.trim().toUpperCase())
+      : undefined;
+
     const filters = {
-      status: req.query.status,
-      priority: req.query.priority,
+      // Single value filters
+      status: req.query.status?.toUpperCase(),
+      priority: req.query.priority?.toUpperCase(),
       assignedTo: req.query.assignedTo ? parseInt(req.query.assignedTo) : undefined,
       createdBy: req.query.createdBy ? parseInt(req.query.createdBy) : undefined,
       search: req.query.search,
+      
+      // Date range filters
+      fromDate: req.query.fromDate,
+      toDate: req.query.toDate,
+      dueFrom: req.query.dueFrom,
+      dueTo: req.query.dueTo,
+      
+      // Special filters
+      overdue: req.query.overdue,
+      
+      // Multiple value filters
+      statuses,
+      priorities,
+      
+      // Pagination
       page: req.query.page ? parseInt(req.query.page) : 1,
       limit: req.query.limit ? parseInt(req.query.limit) : 10,
+      
+      // Sorting
+      sortBy: req.query.sortBy || 'createdAt',
+      sortOrder: req.query.sortOrder?.toLowerCase() || 'desc'
     };
 
     // EMPLOYEE can only see tasks assigned to them
@@ -112,7 +151,7 @@ const createTask = async (req, res, next) => {
     // Validate status if provided
     if (status) {
       const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED'];
-      if (!validStatuses.includes(status)) {
+      if (!validStatuses.includes(status.toUpperCase())) {
         return res.status(400).json({
           success: false,
           message: 'Invalid status. Must be TODO, IN_PROGRESS, or COMPLETED'
@@ -123,7 +162,7 @@ const createTask = async (req, res, next) => {
     // Validate priority if provided
     if (priority) {
       const validPriorities = ['LOW', 'MEDIUM', 'HIGH'];
-      if (!validPriorities.includes(priority)) {
+      if (!validPriorities.includes(priority.toUpperCase())) {
         return res.status(400).json({
           success: false,
           message: 'Invalid priority. Must be LOW, MEDIUM, or HIGH'
@@ -145,8 +184,8 @@ const createTask = async (req, res, next) => {
     const task = await taskService.createTask({
       title,
       description,
-      status,
-      priority,
+      status: status?.toUpperCase(),
+      priority: priority?.toUpperCase(),
       dueDate,
       assignedTo,
       createdBy: req.user.id
@@ -185,7 +224,7 @@ const updateTask = async (req, res, next) => {
     // Validate status if provided
     if (status) {
       const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED'];
-      if (!validStatuses.includes(status)) {
+      if (!validStatuses.includes(status.toUpperCase())) {
         return res.status(400).json({
           success: false,
           message: 'Invalid status. Must be TODO, IN_PROGRESS, or COMPLETED'
@@ -196,7 +235,7 @@ const updateTask = async (req, res, next) => {
     // Validate priority if provided
     if (priority) {
       const validPriorities = ['LOW', 'MEDIUM', 'HIGH'];
-      if (!validPriorities.includes(priority)) {
+      if (!validPriorities.includes(priority.toUpperCase())) {
         return res.status(400).json({
           success: false,
           message: 'Invalid priority. Must be LOW, MEDIUM, or HIGH'
@@ -215,7 +254,11 @@ const updateTask = async (req, res, next) => {
       }
     }
 
-    const task = await taskService.updateTask(taskId, req.body, req.user);
+    const task = await taskService.updateTask(taskId, {
+      ...req.body,
+      status: status?.toUpperCase(),
+      priority: priority?.toUpperCase()
+    }, req.user);
 
     res.status(200).json({
       success: true,
@@ -254,10 +297,28 @@ const deleteTask = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/tasks/stats
+ * Get task statistics (for dashboard)
+ */
+const getTaskStats = async (req, res, next) => {
+  try {
+    const stats = await taskService.getTaskStats();
+
+    res.status(200).json({
+      success: true,
+       { stats }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getTasks,
   getTask,
   createTask,
   updateTask,
-  deleteTask
+  deleteTask,
+  getTaskStats
 };
