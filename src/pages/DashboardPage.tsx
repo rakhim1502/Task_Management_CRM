@@ -1,59 +1,87 @@
 /**
  * Dashboard Page
  * 
- * Main dashboard with statistics, charts, and recent tasks
+ * Main dashboard with statistics overview
+ * Uses demo data for frontend demonstration
  */
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { getDashboardStats, DashboardStats } from '../services/dashboardService';
 import StatCard from '../components/dashboard/StatCard';
 import TaskChart from '../components/dashboard/TaskChart';
 import RecentTasks from '../components/dashboard/RecentTasks';
 
+// Demo data for frontend demonstration
+const demoStats = {
+  overview: {
+    totalUsers: 5,
+    totalEmployees: 3,
+    totalTasks: 10,
+    completionRate: 30,
+    tasksPerEmployee: 3,
+    overdueTasks: 2
+  },
+  byStatus: {
+    todo: 4,
+    inProgress: 3,
+    completed: 3
+  },
+  byPriority: {
+    high: 3,
+    medium: 4,
+    low: 3
+  },
+  thisMonth: {
+    created: 5,
+    completed: 2
+  },
+  recentTasks: [
+    {
+      id: 1,
+      title: 'Website Redesign',
+      status: 'TODO' as const,
+      priority: 'HIGH' as const,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      assignee: { id: 3, name: 'John Developer' }
+    },
+    {
+      id: 2,
+      title: 'API Integration',
+      status: 'IN_PROGRESS' as const,
+      priority: 'HIGH' as const,
+      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      assignee: { id: 4, name: 'Emma Designer' }
+    },
+    {
+      id: 3,
+      title: 'Database Optimization',
+      status: 'COMPLETED' as const,
+      priority: 'MEDIUM' as const,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      assignee: { id: 5, name: 'Mike Analyst' }
+    },
+    {
+      id: 4,
+      title: 'Write Documentation',
+      status: 'TODO' as const,
+      priority: 'LOW' as const,
+      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      assignee: { id: 3, name: 'John Developer' }
+    },
+    {
+      id: 5,
+      title: 'Bug Fixes',
+      status: 'IN_PROGRESS' as const,
+      priority: 'HIGH' as const,
+      createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      assignee: { id: 4, name: 'Emma Designer' }
+    }
+  ],
+  tasksByEmployee: []
+};
+
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const data = await getDashboardStats();
-        setStats(data);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load dashboard statistics');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          <p className="mt-4 text-slate-400">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-        <p className="text-sm text-red-400">{error}</p>
-      </div>
-    );
-  }
-
-  if (!stats) {
-    return null;
-  }
+  const stats = demoStats;
 
   return (
     <div>

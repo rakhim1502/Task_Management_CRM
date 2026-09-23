@@ -2,36 +2,61 @@
  * User List Component
  * 
  * Displays a list of users with search and role filter
+ * Uses demo data for frontend demonstration
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getUsers, User } from '../../services/userService';
 import { useAuth } from '../../hooks/useAuth';
+
+// Demo users
+const demoUsers = [
+  {
+    id: 1,
+    name: 'Admin User',
+    email: 'admin@crm.com',
+    role: 'ADMIN' as const,
+    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 2,
+    name: 'Sarah Manager',
+    email: 'manager@crm.com',
+    role: 'MANAGER' as const,
+    createdAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 3,
+    name: 'John Developer',
+    email: 'employee1@crm.com',
+    role: 'EMPLOYEE' as const,
+    createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 4,
+    name: 'Emma Designer',
+    email: 'employee2@crm.com',
+    role: 'EMPLOYEE' as const,
+    createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 5,
+    name: 'Mike Analyst',
+    email: 'employee3@crm.com',
+    role: 'EMPLOYEE' as const,
+    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
 
 const UserList: React.FC = () => {
   const { user } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [users] = useState(demoUsers);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-
-  // Fetch users
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        const data = await getUsers();
-        setUsers(data);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load users');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUsers();
-  }, []);
 
   // Filter users
   const filteredUsers = users.filter((u) => {
@@ -53,25 +78,6 @@ const UserList: React.FC = () => {
     };
     return colors[role as keyof typeof colors] || 'bg-slate-500/20 text-slate-400';
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          <p className="mt-4 text-slate-400">Loading users...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-        <p className="text-sm text-red-400">{error}</p>
-      </div>
-    );
-  }
 
   return (
     <div>

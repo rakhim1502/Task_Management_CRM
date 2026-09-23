@@ -2,63 +2,94 @@
  * Task List Component
  * 
  * Displays a list of tasks with filtering, search, and pagination
+ * Uses demo data for frontend demonstration
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getTasks, Task, TaskFilters } from '../../services/taskService';
 import { useAuth } from '../../hooks/useAuth';
+
+// Demo tasks
+const demoTasks = [
+  {
+    id: 1,
+    title: 'Website Redesign',
+    description: 'Redesign the company website with modern UI/UX principles',
+    status: 'TODO' as const,
+    priority: 'HIGH' as const,
+    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    assignee: { id: 3, name: 'John Developer', email: 'employee1@crm.com' },
+    creator: { id: 1, name: 'Admin User', email: 'admin@crm.com' },
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 2,
+    title: 'API Integration',
+    description: 'Integrate third-party payment API',
+    status: 'IN_PROGRESS' as const,
+    priority: 'HIGH' as const,
+    dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+    assignee: { id: 4, name: 'Emma Designer', email: 'employee2@crm.com' },
+    creator: { id: 2, name: 'Sarah Manager', email: 'manager@crm.com' },
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 3,
+    title: 'Database Optimization',
+    description: 'Optimize slow database queries',
+    status: 'COMPLETED' as const,
+    priority: 'MEDIUM' as const,
+    dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    assignee: { id: 5, name: 'Mike Analyst', email: 'employee3@crm.com' },
+    creator: { id: 1, name: 'Admin User', email: 'admin@crm.com' },
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 4,
+    title: 'Write Documentation',
+    description: 'Write API documentation for developers',
+    status: 'TODO' as const,
+    priority: 'LOW' as const,
+    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    assignee: { id: 3, name: 'John Developer', email: 'employee1@crm.com' },
+    creator: { id: 2, name: 'Sarah Manager', email: 'manager@crm.com' },
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 5,
+    title: 'Bug Fixes',
+    description: 'Fix reported bugs in production',
+    status: 'IN_PROGRESS' as const,
+    priority: 'HIGH' as const,
+    dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+    assignee: { id: 4, name: 'Emma Designer', email: 'employee2@crm.com' },
+    creator: { id: 1, name: 'Admin User', email: 'admin@crm.com' },
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
 
 const TaskList: React.FC = () => {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [filters, setFilters] = useState<TaskFilters>({
-    page: 1,
-    limit: 10,
-    search: '',
-    status: '',
-    priority: ''
+  const [tasks] = useState(demoTasks);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+
+  // Filter tasks
+  const filteredTasks = tasks.filter((task) => {
+    const matchesSearch = 
+      task.title.toLowerCase().includes(search.toLowerCase()) ||
+      (task.description && task.description.toLowerCase().includes(search.toLowerCase()));
+    
+    const matchesStatus = !statusFilter || task.status === statusFilter;
+    const matchesPriority = !priorityFilter || task.priority === priorityFilter;
+    
+    return matchesSearch && matchesStatus && matchesPriority;
   });
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 0
-  });
-
-  // Fetch tasks
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        setLoading(true);
-        const data = await getTasks(filters);
-        setTasks(data.tasks);
-        setPagination(data.pagination);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load tasks');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTasks();
-  }, [filters]);
-
-  // Handle search
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters({ ...filters, search: e.target.value, page: 1 });
-  };
-
-  // Handle filter change
-  const handleFilterChange = (key: keyof TaskFilters, value: string) => {
-    setFilters({ ...filters, [key]: value, page: 1 });
-  };
-
-  // Handle page change
-  const handlePageChange = (newPage: number) => {
-    setFilters({ ...filters, page: newPage });
-  };
 
   // Get status badge color
   const getStatusBadge = (status: string) => {
@@ -91,25 +122,6 @@ const TaskList: React.FC = () => {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          <p className="mt-4 text-slate-400">Loading tasks...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-        <p className="text-sm text-red-400">{error}</p>
-      </div>
-    );
-  }
-
   return (
     <div>
       {/* Header */}
@@ -139,16 +151,16 @@ const TaskList: React.FC = () => {
             <input
               type="text"
               placeholder="Search tasks..."
-              value={filters.search || ''}
-              onChange={handleSearch}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           {/* Status Filter */}
           <select
-            value={filters.status || ''}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
             className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Status</option>
@@ -159,8 +171,8 @@ const TaskList: React.FC = () => {
 
           {/* Priority Filter */}
           <select
-            value={filters.priority || ''}
-            onChange={(e) => handleFilterChange('priority', e.target.value)}
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
             className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Priority</option>
@@ -172,7 +184,7 @@ const TaskList: React.FC = () => {
       </div>
 
       {/* Task List */}
-      {tasks.length === 0 ? (
+      {filteredTasks.length === 0 ? (
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-12 border border-slate-700 text-center">
           <svg className="w-16 h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -182,7 +194,7 @@ const TaskList: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {tasks.map((task) => (
+          {filteredTasks.map((task) => (
             <Link
               key={task.id}
               to={`/tasks/${task.id}`}
@@ -228,33 +240,33 @@ const TaskList: React.FC = () => {
         </div>
       )}
 
-      {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between">
-          <div className="text-sm text-slate-400">
-            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} tasks
+      {/* Stats */}
+      <div className="mt-6 bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <p className="text-2xl font-bold text-white">{tasks.length}</p>
+            <p className="text-sm text-slate-400">Total Tasks</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handlePageChange(pagination.page - 1)}
-              disabled={pagination.page === 1}
-              className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
-            >
-              Previous
-            </button>
-            <span className="px-4 py-2 text-slate-400">
-              Page {pagination.page} of {pagination.totalPages}
-            </span>
-            <button
-              onClick={() => handlePageChange(pagination.page + 1)}
-              disabled={pagination.page === pagination.totalPages}
-              className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
-            >
-              Next
-            </button>
+          <div>
+            <p className="text-2xl font-bold text-slate-400">
+              {tasks.filter(t => t.status === 'TODO').length}
+            </p>
+            <p className="text-sm text-slate-400">TODO</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-blue-400">
+              {tasks.filter(t => t.status === 'IN_PROGRESS').length}
+            </p>
+            <p className="text-sm text-slate-400">In Progress</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-green-400">
+              {tasks.filter(t => t.status === 'COMPLETED').length}
+            </p>
+            <p className="text-sm text-slate-400">Completed</p>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
